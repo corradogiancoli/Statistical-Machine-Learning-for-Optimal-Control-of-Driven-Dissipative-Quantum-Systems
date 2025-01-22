@@ -51,5 +51,6 @@ fig, ani = anim_wigner(rho_cavity, xvec, xvec, projection='3d',
 ani.save('wigner_function_animation.mp4', writer=writer)
 
 # close an auto-generated plot and animation
+# prova
 plt.close()
 
