@@ -11,16 +11,15 @@ matplotlib.use('TkAgg')
 # System parameters
 wc = 1.0 * 2 * np.pi  # cavity frequency
 wa = 1.0 * 2 * np.pi  # atom frequency 
-g = 5 * 2 * np.pi # coupling strength
-#g = 0
+g = 0.5 * 2 * np.pi # coupling strength
 
 # Hilbert space dimension for the cavity
 n_cavity = 75
 
 # Operators
-sigma_minus = tensor(qeye(n_cavity), sigmap()) # atomic lowering operator
+sigma_minus = tensor(qeye(n_cavity), destroy(2)) # atomic lowering operator
 sigma_plus = sigma_minus.dag()   # atomic raising operator
-sigma_z = tensor(qeye(n_cavity), sigmaz().dag())     # atomic z operator
+sigma_z = tensor(qeye(n_cavity), sigmaz())     # atomic z operator
 a = tensor(destroy(n_cavity), qeye(2))   # cavity annihilation operator
 
 # Times for which the state should be evaluated
@@ -30,25 +29,25 @@ tau = wc * times
 
 
 # Hamiltonian with rotating wave approximation
-H_theoretical =  a.dag() * a + 0.5 * (wa/wc) * sigma_z +  (g/wc) * (a.dag() * sigma_minus + a * sigma_plus)
+H_theoretical =  a.dag() * a + 0.5 * (wa/wc) * sigma_minus*sigma_plus +  (g/wc) * (a.dag() * sigma_minus + a * sigma_plus)
 
 H_experimental = wc * H_theoretical
 
 
 # Initial state: superposition of state
-psi0 = (tensor(fock(n_cavity, 1), basis(2, 1)) + tensor(fock(n_cavity, 2), basis(2, 0)))
+psi0 = tensor(fock(n_cavity, 1), fock(2, 1)) + tensor(fock(n_cavity, 2), fock(2, 0))
 
 
 # Solve the Schrodinger equation
 result = mesolve(H_theoretical, psi0, tau, c_ops=[], e_ops=[a.dag() * a, sigma_plus * sigma_minus])
+#result_alt =  mesolve(H_experimental, psi0, times, c_ops=[], e_ops=[a.dag() * a, sigma_plus * sigma_minus])
 #solver = SESolver(H_theoretical)
 #result = solver.run(psi0, tau, e_ops = [a.dag() * a, sigma_plus * sigma_minus])
 
 n_c = result.expect[0]
 n_a = result.expect[1]
 
-#psi_array = psi0.full()
-fig, axes = plt.subplots(1, 1, figsize=(10, 6))
+fig, axes = plt.subplots(1, 1, figsize=(10, 6))#
 axes.plot(result.times, n_c, label="Cavity")
 axes.plot(result.times, n_a, label="Atom Excitation")
 axes.grid(True)
@@ -56,71 +55,66 @@ axes.legend(loc='best')
 axes.set_xlabel("Time (arb. units)")
 axes.set_xlim(0,5)
 axes.set_ylabel("Photon number")
-axes.set_title("Initial States: (2,g) + (1, e)")
-plt.savefig('JC_model.png')
+axes.set_title("Initial States: (2,g) + (1,e)")
+#plt.savefig('JC_model.png')
 plt.show()
-
-# Fourier Transform
-fft_result = np.fft.fft(n_c)
-fft_freq = np.fft.fftfreq(n_c.size, d=(tau[1] - tau[0]) / wc)
-
-# Plotting frequency-domain response
-fig, ax = plt.subplots()
-ax.plot(fft_freq, np.abs(fft_result))
-#ax.set_xlim([0, wc])  # Limiting to positive frequencies and within the cavity frequency range
-ax.set_xlabel('Frequency (arb. units)')
-ax.set_ylabel('Amplitude')
-
-# Find the peak in the FFT
-positive_freq_indices = np.where(fft_freq > 0.1)  # Consider only positive frequencies
-peak_freq_index = np.argmax(np.abs(fft_result[positive_freq_indices]))  # Index of the max in the positive freq domain
-peak_freq = fft_freq[positive_freq_indices][peak_freq_index]  # The frequency corresponding to the peak
-peak_amplitude = np.abs(fft_result[positive_freq_indices][peak_freq_index])  # The amplitude at the peak
-
-ax.scatter([peak_freq], [peak_amplitude], color='red')  # Mark the peak frequency
-ax.set_xlim([0, 0.5*wc])  # Limiting to positive frequencies and within the cavity frequency range
-ax.set_xlabel('Frequency (rad/s)')
-ax.set_ylabel('Amplitude')
-ax.set_title('Fourier Transform of Cavity Photon Number')
-plt.show()
-
-print(f"Peak Frequency: {peak_freq} rad/s, Amplitude: {peak_amplitude}")
 
 
 #Iterate and verify model
 
-n_list = np.arange(1,21,1)
+n_list = np.arange(1,11,1)
 
-theo_freq = g * np.sqrt(n_list) #theoretical values
+theo_freq = g * np.sqrt(n_list)#theoretical values
 
 freq_list = []
 
-g = basis(2, 0)
-e = basis(2, 1)
 
 
 for n in n_list:
-    psi = tensor(fock(n_cavity, n), g) + tensor(fock(n_cavity, n-1), e)
-    #print(psi.dims)
+    psi = tensor(fock(n_cavity, n), fock(2,0)) + tensor(fock(n_cavity, n-1), fock(2,1))
     output = mesolve(H_theoretical, psi, tau, c_ops=[], e_ops=[a.dag() * a, sigma_plus * sigma_minus])
+    #output_alt = mesolve(H_experimental, psi, times, c_ops=[], e_ops=[a.dag() * a, sigma_plus * sigma_minus])
     n_c = output.expect[0]
+    n_a = output.expect[1]
+    #n_a_alt = output_alt.expect[1]
 
-    peaks, _ = find_peaks(n_c, height=0.5)  # You might need to adjust the 'height' parameter based on your data
+    peaks, _ = find_peaks(n_a, height=0.5) 
+    #peaks_alt, _ = find_peaks(n_a_alt, height=0.5)
+    #fig, axes = plt.subplots(1, 1, figsize=(10, 6))
+    #axes.plot(output.times, n_c, label="Cavity Photon Number")
+    #axes.plot(output.times, n_a, label="Atom Excitation")
+    #axes.scatter(tau[peaks], np.array(n_a)[peaks], color='red', s=10, marker='o', label='Peaks')  # Mark peaks
+    #axes.grid(True)
+    #axes.legend(loc='best')
+    #axes.set_xlabel("Time (arb.units)")
+    #axes.set_ylabel("Photon number")
+    #axes.set_title(f"Photon and Atom Excitation Dynamics for n={n}")
+    #plt.show()
 
+
+    
     # Calculate time points of peaks
     peak_times = tau[peaks]
+    #peak_times_alt = times[peaks_alt]
     periods = np.diff(peak_times)
+    #print(f'{n}:',periods)
+    #periods_alt = np.diff(peak_times_alt)
     average_period = np.mean(periods)
+    #average_period_alt = np.mean(periods_alt) * wc
+    #print(f'The theo period is {average_period} and the experimental period is {average_period_alt}')
+    error_period = np.std(periods)
     frequency = 1 / average_period if average_period != 0 else 0
 
-    freq_list.append(frequency * np.pi * wc)
+    freq_list.append(frequency * 2 * np.pi * wc)
 
-print(freq_list)
+
 plt.figure()
 plt.scatter(n_list, freq_list, marker = 'x', label = 'experimental frequency')
 plt.scatter(n_list, theo_freq, color = 'red', marker = 'x', label = 'theoretical prediction')
 plt.xlabel('Fock state of cavity')
 plt.ylabel('Frequency (arb. units)')
+plt.xscale('log')  # Setting log scale for x-axis
+plt.yscale('log')
 plt.grid(True)
 plt.legend(loc='best')
 plt.savefig('Rabi_oscillations_2.png')
